@@ -81,7 +81,11 @@ static constexpr uint8_t SERVO_PINS[] = GPIO_PIN_PWM_OUTPUTS;
 static constexpr uint8_t SERVO_COUNT = ARRAY_SIZE(SERVO_PINS);
 static Servo *Servos[SERVO_COUNT];
 static bool newChannelsAvailable;
+const int analogInPin = A0;  //ESP8266模拟引脚ADC0,也就是A0
+
 #endif
+
+   
 
 /* CRSF_TX_SERIAL is used by CRSF output */
 #if defined(TARGET_RX_FM30_MINI)
@@ -286,6 +290,37 @@ bool ICACHE_RAM_ATTR HandleFHSS()
     return true;
 }
 
+#if defined(GPIO_PIN_PWM_OUTPUTS)
+uint8_t battery_crsf_buffer[CRSF_MAX_PACKET_LEN+1];
+
+int battery_sensorValue = 1024;  
+
+void ICACHE_RAM_ATTR addBatteryTelemetry()
+{
+
+        int curv =analogRead(analogInPin); 
+        battery_sensorValue =  (battery_sensorValue*9+curv)/10;
+        uint16_t intv = battery_sensorValue/1024 * 100 * 8/100;
+    
+        battery_crsf_buffer[0]= CRSF_SYNC_BYTE;
+        battery_crsf_buffer[CRSF_TELEMETRY_LENGTH_INDEX] = CRSF_FRAME_BATTERY_SENSOR_PAYLOAD_SIZE + CRSF_TELEMETRY_CRC_LENGTH;
+        battery_crsf_buffer[2] = battery_sensorValue >> 8;
+        battery_crsf_buffer[3] = battery_sensorValue;
+        battery_crsf_buffer[4] =  1; // getAmperage() ;
+        battery_crsf_buffer[5] = 1; //(getMAhDrawn() >> 16));
+        battery_crsf_buffer[6] = 1; //(getMAhDrawn() >> 8));
+        battery_crsf_buffer[7] = 1; //(uint8_t)getMAhDrawn());
+        battery_crsf_buffer[8] = 100; //batteryRemainingPercentage
+        uint8_t crc = crsf_crc.calc(battery_crsf_buffer + CRSF_FRAME_NOT_COUNTED_BYTES, battery_crsf_buffer[CRSF_TELEMETRY_LENGTH_INDEX] - CRSF_TELEMETRY_CRC_LENGTH);
+        battery_crsf_buffer[9] = crc;
+        telemetry.AppendTelemetryPackage(battery_crsf_buffer);
+
+
+
+}
+#endif
+
+
 bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
 {
     uint8_t *data;
@@ -313,6 +348,10 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
         Radio.TXdataBuffer[5] = crsf.LinkStatistics.uplink_Link_quality;
         Radio.TXdataBuffer[6] = MspReceiver.GetCurrentConfirm() ? 1 : 0;
 
+
+#if defined(GPIO_PIN_PWM_OUTPUTS)
+        addBatteryTelemetry();
+#endif
         NextTelemetryType = ELRS_TELEMETRY_TYPE_DATA;
         // Start the count at 1 because the next will be DATA and doing +1 before checking
         // against Max below is for some reason 10 bytes more code
@@ -1278,6 +1317,8 @@ void loop()
     }
     updateTelemetryBurst();
     updateBindingMode();
+
+   
 }
 
 struct bootloader {
