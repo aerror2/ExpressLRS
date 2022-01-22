@@ -298,15 +298,16 @@ int battery_sensorValue = 1024;
 void ICACHE_RAM_ATTR addBatteryTelemetry()
 {
 
-        int curv =analogRead(analogInPin); 
-        battery_sensorValue =  (battery_sensorValue*9+curv)/10;
-        uint16_t intv = battery_sensorValue * 100/1024 ;
+
+       // uint16_t intv = battery_sensorValue*107/ 37 ;
+        //1740 -->1220
+        uint16_t vintv = battery_sensorValue *12/18;
 
         battery_crsf_buffer[0]= CRSF_SYNC_BYTE;  //addr 
         battery_crsf_buffer[1] = 9;
         battery_crsf_buffer[2] = CRSF_FRAMETYPE_BATTERY_SENSOR; //type
-        battery_crsf_buffer[3] = battery_sensorValue >> 8;
-        battery_crsf_buffer[4] = battery_sensorValue;
+        battery_crsf_buffer[3] = vintv >> 8;
+        battery_crsf_buffer[4] = vintv;
         battery_crsf_buffer[5] =  1; // getAmperage() ;
         battery_crsf_buffer[6] = 1; //(getMAhDrawn() >> 16));
         battery_crsf_buffer[7] = 1; //(getMAhDrawn() >> 8));
@@ -336,6 +337,8 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
 
     alreadyTLMresp = true;
     Radio.TXdataBuffer[0] = TLM_PACKET;
+
+
 
     if (NextTelemetryType == ELRS_TELEMETRY_TYPE_LINK || !TelemetrySender.IsActive())
     {
@@ -1246,7 +1249,7 @@ void setup()
 
     devicesStart();
 }
-
+unsigned long lastadcread = 0;
 void loop()
 {
     unsigned long now = millis();
@@ -1319,7 +1322,15 @@ void loop()
     updateTelemetryBurst();
     updateBindingMode();
 
-   
+#if defined(GPIO_PIN_PWM_OUTPUTS)
+    if(now-lastadcread>5)
+    {
+        lastadcread = now;
+        int curv =analogRead(analogInPin); 
+        battery_sensorValue = curv ;//  (battery_sensorValue+curv)/2;
+
+    }
+#endif
 }
 
 struct bootloader {
