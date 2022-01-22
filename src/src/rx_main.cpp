@@ -300,19 +300,20 @@ void ICACHE_RAM_ATTR addBatteryTelemetry()
 
         int curv =analogRead(analogInPin); 
         battery_sensorValue =  (battery_sensorValue*9+curv)/10;
-        uint16_t intv = battery_sensorValue/1024 * 100 * 8/100;
-    
-        battery_crsf_buffer[0]= CRSF_SYNC_BYTE;
-        battery_crsf_buffer[CRSF_TELEMETRY_LENGTH_INDEX] = CRSF_FRAME_BATTERY_SENSOR_PAYLOAD_SIZE + CRSF_TELEMETRY_CRC_LENGTH;
-        battery_crsf_buffer[2] = battery_sensorValue >> 8;
-        battery_crsf_buffer[3] = battery_sensorValue;
-        battery_crsf_buffer[4] =  1; // getAmperage() ;
-        battery_crsf_buffer[5] = 1; //(getMAhDrawn() >> 16));
-        battery_crsf_buffer[6] = 1; //(getMAhDrawn() >> 8));
-        battery_crsf_buffer[7] = 1; //(uint8_t)getMAhDrawn());
-        battery_crsf_buffer[8] = 100; //batteryRemainingPercentage
+        uint16_t intv = battery_sensorValue * 100/1024 ;
+
+        battery_crsf_buffer[0]= CRSF_SYNC_BYTE;  //addr 
+        battery_crsf_buffer[1] = 9;
+        battery_crsf_buffer[2] = CRSF_FRAMETYPE_BATTERY_SENSOR; //type
+        battery_crsf_buffer[3] = battery_sensorValue >> 8;
+        battery_crsf_buffer[4] = battery_sensorValue;
+        battery_crsf_buffer[5] =  1; // getAmperage() ;
+        battery_crsf_buffer[6] = 1; //(getMAhDrawn() >> 16));
+        battery_crsf_buffer[7] = 1; //(getMAhDrawn() >> 8));
+        battery_crsf_buffer[8] = 1; //(uint8_t)getMAhDrawn());
+        battery_crsf_buffer[9] = 100; //batteryRemainingPercentage
         uint8_t crc = crsf_crc.calc(battery_crsf_buffer + CRSF_FRAME_NOT_COUNTED_BYTES, battery_crsf_buffer[CRSF_TELEMETRY_LENGTH_INDEX] - CRSF_TELEMETRY_CRC_LENGTH);
-        battery_crsf_buffer[9] = crc;
+        battery_crsf_buffer[10] = crc;
         telemetry.AppendTelemetryPackage(battery_crsf_buffer);
 
 
