@@ -40,6 +40,7 @@ public:
     /////////////Packet Stats//////////
     int8_t LastPacketRSSI = 0;
     int8_t LastPacketSNR = 0;
+    int8_t LastSignalRssiPkt = 0;
     volatile uint8_t NonceTX = 0;
     volatile uint8_t NonceRX = 0;
     static uint32_t TotalTime;
@@ -70,7 +71,7 @@ public:
     void ICACHE_RAM_ATTR SetFIFOaddr(uint8_t txBaseAddr, uint8_t rxBaseAddr);
     void SetOutputPower(int8_t power);
     void SetOutputPowerMax() { SetOutputPower(13); };
-
+    void SetPaConfig(uint8_t paDutyCycle, uint8_t hpMax, uint8_t deviceSel, uint8_t paLut);
     int32_t ICACHE_RAM_ATTR GetFrequencyError();
 
     void TXnb();

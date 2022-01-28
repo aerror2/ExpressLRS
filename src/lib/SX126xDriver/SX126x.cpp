@@ -85,6 +85,20 @@ bool SX126XDriver::Begin()
     return true;
 }
 
+
+
+void  SX126XDriver::SetPaConfig(uint8_t paDutyCycle, uint8_t hpMax, uint8_t deviceSel, uint8_t paLut)
+{
+    uint8_t buf[4];
+
+    buf[0] = paDutyCycle;
+    buf[1] = hpMax;
+    buf[2] = deviceSel;
+    buf[3] = paLut;
+    hal.WriteCommand(SX126X_RADIO_SET_PACONFIG, buf, 4);
+}
+
+
 void SX126XDriver::Config(SX126X_RadioLoRaBandwidths_t bw, SX126X_RadioLoRaSpreadingFactors_t sf, SX126X_RadioLoRaCodingRates_t cr, uint32_t freq, uint8_t PreambleLength, bool InvertIQ, uint8_t PayloadLength)
 {
     PayloadLength = PayloadLength;
@@ -107,34 +121,36 @@ void SX126XDriver::SetOutputPower(int8_t power)
 
     uint8_t buf[2];
 
+#if defined(SX1261)
     // if (SX126xGetPaSelect(0) == SX1261)
-    // {
-    //     if (power == 15)
-    //     {
-    //         SX126xSetPaConfig(0x06, 0x00, 0x01, 0x01);
-    //     }
-    //     else
-    //     {
-    //         SX126xSetPaConfig(0x04, 0x00, 0x01, 0x01);
-    //     }
-    //     if (power >= 14)
-    //     {
-    //         power = 14;
-    //     }
-    //     else if (power < -17)
-    //     {
-    //         power = -17;
-    //     }
-    //     SX126xWriteRegister(REG_OCP, 0x18); // current max is 80 mA for the whole device
-    // }
+     {
+         if (power == 15)
+         {
+             SetPaConfig(0x06, 0x00, 0x01, 0x01);
+         }
+         else
+         {
+             SetPaConfig(0x04, 0x00, 0x01, 0x01);
+         }
+         if (power >= 14)
+         {
+             power = 14;
+         }
+         else if (power < -17)
+         {
+             power = -17;
+         }
+         hal.writeRegister(REG_OCP, 0x18); // current max is 80 mA for the whole device
+     }
     // else // sx1262
+#else
     {
         // WORKAROUND - Better Resistance of the SX1262 Tx to Antenna Mismatch, see DS_SX1261-2_V1.2 datasheet chapter 15.2
         // RegTxClampConfig = @address 0x08D8
-        SX126xWriteRegister(0x08D8, SX126xReadRegister(0x08D8) | (0x0F << 1));
+        hal.writeRegister(0x08D8, hal.ReadRegister(0x08D8) | (0x0F << 1));
         // WORKAROUND END
 
-        SX126xSetPaConfig(0x04, 0x07, 0x00, 0x01);
+        SetPaConfig(0x04, 0x07, 0x00, 0x01);
         if (power > 22)
         {
             power = 22;
@@ -143,8 +159,10 @@ void SX126XDriver::SetOutputPower(int8_t power)
         {
             power = -9;
         }
-        SX126xWriteRegister(REG_OCP, 0x38); // current max 160mA for the whole device
+        hal.writeRegister(REG_OCP, 0x38); // current max 160mA for the whole device
     }
+#endif
+
     buf[0] = power;
     buf[1] = (uint8_t)rampTime;
     SX126xWriteCommand(SX126X_RADIO_SET_TXPARAMS, buf, 2);
@@ -181,24 +199,24 @@ void SX126XDriver::SetMode(SX126X_RadioOperatingModes_t OPmode)
     {
 
     case SX126X_MODE_SLEEP:
-        hal.WriteCommand(RADIO_SET_SLEEP, 0x01);
+        hal.WriteCommand(SX126X_RADIO_SET_SLEEP, 0x01);
         break;
 
     case SX126X_MODE_CALIBRATION:
         break;
 
     case SX126X_MODE_STDBY_RC:
-        hal.WriteCommand(RADIO_SET_STANDBY, SX126X_STDBY_RC);
+        hal.WriteCommand(SX126X_RADIO_SET_STANDBY, SX126X_STDBY_RC);
         switchDelay = 1500;
         break;
 
     case SX126X_MODE_STDBY_XOSC:
-        hal.WriteCommand(RADIO_SET_STANDBY, SX126X_STDBY_XOSC);
+        hal.WriteCommand(SX126X_RADIO_SET_STANDBY, SX126X_STDBY_XOSC);
         switchDelay = 50;
         break;
 
     case SX126X_MODE_FS:
-        hal.WriteCommand(RADIO_SET_FS, 0x00);
+        hal.WriteCommand(SX126X_RADIO_SET_FS, 0x00);
         switchDelay = 70;
         break;
 
@@ -206,7 +224,7 @@ void SX126XDriver::SetMode(SX126X_RadioOperatingModes_t OPmode)
         buf[0] = 0x00; // periodBase = 1ms, page 71 datasheet, set to FF for cont RX
         buf[1] = 0xFF;
         buf[2] = 0xFF;
-        hal.WriteCommand(RADIO_SET_RX, buf, sizeof(buf));
+        hal.WriteCommand(SX126X_RADIO_SET_RX, buf, sizeof(buf));
         switchDelay = 100;
         break;
 
@@ -215,13 +233,13 @@ void SX126XDriver::SetMode(SX126X_RadioOperatingModes_t OPmode)
         buf[0] = 0x00; // periodBase = 1ms, page 71 datasheet
         buf[1] = 0xFF; // no timeout set for now
         buf[2] = 0xFF; // TODO dynamic timeout based on expected onairtime
-        hal.WriteCommand(RADIO_SET_TX, buf, sizeof(buf));
+        hal.WriteCommand(SX126X_RADIO_SET_TX, buf, sizeof(buf));
         switchDelay = 100;
         break;
 
     case SX126X_MODE_CAD:
 
-        hal.WriteCommand(RADIO_SET_CAD, 0, 0);
+        hal.WriteCommand(SX126X_RADIO_SET_CAD, 0, 0);
         break;
 
     default:
@@ -475,11 +493,12 @@ bool ICACHE_RAM_ATTR SX126XDriver::GetFrequencyErrorbool()
 
 void ICACHE_RAM_ATTR SX126XDriver::GetLastPacketStats()
 {
-    uint8_t status[2];
+    uint8_t status[3];
 
-    hal.ReadCommand(SX126X_RADIO_GET_PACKETSTATUS, status, 2);
-    LastPacketRSSI = -(int8_t)(status[0] / 2);
-    LastPacketSNR = (int8_t)status[1] / 4;
+    hal.ReadCommand(SX126X_RADIO_GET_PACKETSTATUS, status, 3);
+    LastPacketRSSI =-status[0] >> 1;
+    LastPacketSNR = (((int8_t)status[1]) + 2) >> 2;
+    LastSignalRssiPkt = -status[2] >> 1;
     // https://www.mouser.com/datasheet/2/761/DS_SX126X-1_V2.2-1511144.pdf
     // need to subtract SNR from RSSI when SNR <= 0;
     int8_t negOffset = (LastPacketSNR < 0) ? LastPacketSNR : 0; 
